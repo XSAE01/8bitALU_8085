@@ -1,0 +1,132 @@
+//=============================================================================
+// Testbench: tb_alu_4bit
+// Description: Tests the 4-bit ALU slice with arithmetic and logic operations.
+//              Verifies carry chain and all operation modes.
+//=============================================================================
+
+`timescale 1ns / 1ps
+
+module tb_alu_4bit;
+
+    // Inputs
+    reg  [3:0] a, b;
+    reg        cin;
+    reg  [1:0] op_select;
+
+    // Outputs
+    wire [3:0] result;
+    wire       cout;
+
+    // Instantiate UUT
+    alu_4bit uut (
+        .a         (a),
+        .b         (b),
+        .cin       (cin),
+        .op_select (op_select),
+        .result    (result),
+        .cout      (cout)
+    );
+
+    // Test tracking
+    integer pass_count = 0;
+    integer fail_count = 0;
+    integer test_num   = 0;
+
+    // Task: check 4-bit result
+    task check_result;
+        input [3:0] exp_result;
+        input       exp_cout;
+        input [63:0] test_name;  // 8 chars max
+        begin
+            test_num = test_num + 1;
+            if (result === exp_result && cout === exp_cout) begin
+                pass_count = pass_count + 1;
+                $display("[PASS] Test %0d (%0s): A=%h B=%h Cin=%b OpSel=%b => Result=%h Cout=%b",
+                         test_num, test_name, a, b, cin, op_select, result, cout);
+            end else begin
+                fail_count = fail_count + 1;
+                $display("[FAIL] Test %0d (%0s): A=%h B=%h Cin=%b OpSel=%b => Result=%h Cout=%b (Expected %h, %b)",
+                         test_num, test_name, a, b, cin, op_select, result, cout, exp_result, exp_cout);
+            end
+        end
+    endtask
+
+    initial begin
+        $display("==============================================");
+        $display("  4-bit ALU Slice Testbench");
+        $display("==============================================\n");
+
+        // ===================== ARITHMETIC MODE (op_select = 2'b11) =====================
+        $display("--- Arithmetic Operations (op_select=11) ---");
+        op_select = 2'b11;
+
+        // ADD: 3 + 2 = 5, no carry
+        a = 4'h3; b = 4'h2; cin = 0; #10;
+        check_result(4'h5, 1'b0, "ADD    ");
+
+        // ADD: 8 + 9 = 17 = 1 (carry)
+        a = 4'h8; b = 4'h9; cin = 0; #10;
+        check_result(4'h1, 1'b1, "ADD+CY ");
+
+        // ADD with Cin: 5 + 3 + 1 = 9
+        a = 4'h5; b = 4'h3; cin = 1; #10;
+        check_result(4'h9, 1'b0, "ADC    ");
+
+        // ADD: F + 1 = 0 (carry)
+        a = 4'hF; b = 4'h1; cin = 0; #10;
+        check_result(4'h0, 1'b1, "ADD OVR");
+
+        // ADD: F + F + 1 = 1F (carry, result=F)
+        a = 4'hF; b = 4'hF; cin = 1; #10;
+        check_result(4'hF, 1'b1, "ADC MAX");
+
+        // ===================== LOGIC MODE: AND (op_select = 2'b00) =====================
+        $display("\n--- AND Operations (op_select=00) ---");
+        op_select = 2'b00;
+
+        a = 4'hF; b = 4'hA; cin = 0; #10;
+        check_result(4'hA, 1'b0, "AND    ");  // cout doesn't matter for logic
+
+        a = 4'h5; b = 4'h3; cin = 0; #10;
+        check_result(4'h1, 1'b0, "AND    ");
+
+        // ===================== LOGIC MODE: OR (op_select = 2'b01) =====================
+        $display("\n--- OR Operations (op_select=01) ---");
+        op_select = 2'b01;
+
+        a = 4'h5; b = 4'h3; cin = 0; #10;
+        check_result(4'h7, 1'b0, "OR     ");
+
+        a = 4'h0; b = 4'h0; cin = 0; #10;
+        check_result(4'h0, 1'b0, "OR ZERO");
+
+        // ===================== LOGIC MODE: XOR (op_select = 2'b10) =====================
+        $display("\n--- XOR Operations (op_select=10) ---");
+        op_select = 2'b10;
+
+        a = 4'hF; b = 4'hA; cin = 0; #10;
+        check_result(4'h5, 1'b0, "XOR    ");
+
+        a = 4'h5; b = 4'h5; cin = 0; #10;
+        check_result(4'h0, 1'b0, "XOR EQ ");
+
+        // ===================== Summary =====================
+        $display("\n==============================================");
+        $display("  Results: %0d PASSED, %0d FAILED out of %0d tests",
+                 pass_count, fail_count, test_num);
+        $display("==============================================");
+
+        if (fail_count == 0)
+            $display("  >>> ALL TESTS PASSED <<<");
+        else
+            $display("  >>> SOME TESTS FAILED <<<");
+
+        $finish;
+    end
+
+    initial begin
+        $dumpfile("alu_4bit.vcd");
+        $dumpvars(0, tb_alu_4bit);
+    end
+
+endmodule
