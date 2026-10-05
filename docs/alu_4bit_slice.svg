@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="470" viewBox="0 0 1000 470" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1e8449"/></marker>
+    <style>
+      .blk  { fill: #e8f0fe; stroke: #1a73e8; stroke-width: 2; }
+      .fa   { fill: #fff4e5; stroke: #e67e22; stroke-width: 2; }
+      .mux  { fill: #f4ecf7; stroke: #8e44ad; stroke-width: 2; }
+      .cell { fill: #fff4e5; stroke: #e67e22; stroke-width: 2; }
+      .box  { fill: none; stroke: #999; stroke-width: 1.5; stroke-dasharray: 6 4; }
+      .w    { stroke: #333; stroke-width: 2; fill: none; }
+      .ctl  { stroke: #1e8449; stroke-width: 1.6; fill: none; stroke-dasharray: 6 4; }
+      .t    { text-anchor: middle; }
+      .b    { font-weight: bold; }
+      .s    { font-size: 12px; }
+      .m    { font-family: Consolas, Menlo, monospace; font-size: 12px; }
+      .gc   { fill: #1e8449; }
+    </style>
+  </defs>
+  <rect width="1000" height="470" fill="#ffffff"/>
+
+  <!-- ===================== 1-bit cell ===================== -->
+  <rect class="box" x="10" y="40" width="470" height="400" rx="6"/>
+  <text x="20" y="30" font-size="18" class="b">alu_1bit_slice — one bit</text>
+
+  <!-- inputs -->
+  <text class="m" x="14" y="131">a</text><path class="w" d="M24,135 H58" marker-end="url(#a)"/>
+  <text class="m" x="14" y="161">b</text><path class="w" d="M24,165 H58" marker-end="url(#a)"/>
+  <path class="w" d="M40,135 V285 H58" marker-end="url(#a)"/>
+  <path class="w" d="M50,165 V315 H58" marker-end="url(#a)"/>
+  <circle cx="40" cy="135" r="3" fill="#333"/><circle cx="50" cy="165" r="3" fill="#333"/>
+  <text class="m" x="120" y="74" text-anchor="middle">cin</text><path class="w" d="M120,80 V108" marker-end="url(#a)"/>
+
+  <!-- full adder -->
+  <rect class="fa" x="60" y="110" width="170" height="90" rx="4"/>
+  <text class="t b" x="145" y="132">full_adder</text>
+  <text class="t s" x="145" y="152">sum = a ⊕ b ⊕ cin</text>
+  <text class="t s" x="145" y="170">cout = a·b + cin·(a ⊕ b)</text>
+  <text class="t s" x="145" y="188" fill="#555">2 XOR · 2 AND · 1 OR</text>
+  <!-- cout out -->
+  <path class="w" d="M200,110 V92 H440" marker-end="url(#a)"/><text class="m" x="444" y="96">cout</text>
+
+  <!-- logic block -->
+  <rect class="blk" x="60" y="250" width="170" height="110" rx="4"/>
+  <text class="t b" x="145" y="270">logic block</text>
+  <text class="s" x="80" y="290">AND  a · b</text>
+  <text class="s" x="80" y="320">OR    a + b</text>
+  <text class="s" x="80" y="350">XOR  a ⊕ b</text>
+
+  <!-- mux -->
+  <polygon class="mux" points="300,120 360,150 360,330 300,360"/>
+  <text class="t b" x="330" y="248">MUX</text>
+  <text class="s" x="304" y="154">11</text><text class="s" x="304" y="269">00</text>
+  <text class="s" x="304" y="304">01</text><text class="s" x="304" y="339">10</text>
+  <path class="w" d="M230,150 H298" marker-end="url(#a)"/><text class="m" x="246" y="143">sum</text>
+  <path class="w" d="M230,285 H265 V265 H298" marker-end="url(#a)"/>
+  <path class="w" d="M230,315 V315 H275 V300 H298" marker-end="url(#a)"/>
+  <path class="w" d="M230,345 V345 H285 V335 H298" marker-end="url(#a)"/>
+  <path class="w" d="M360,240 H440" marker-end="url(#a)"/><text class="m" x="444" y="244">result</text>
+  <path class="ctl" d="M330,400 V350" marker-end="url(#g)"/>
+  <text class="t m gc" x="330" y="418">op_select[1:0]</text>
+  <text class="t s" x="245" y="432" fill="#555">00 AND · 01 OR · 10 XOR · 11 SUM (arithmetic)</text>
+
+  <!-- ===================== 4-bit slice ===================== -->
+  <text x="520" y="30" font-size="18" class="b">alu_4bit — 4 cells, ripple carry</text>
+  <!-- cells -->
+  <rect class="cell" x="560" y="200" width="85" height="70" rx="4"/><text class="t b" x="602" y="240">bit 3</text>
+  <rect class="cell" x="665" y="200" width="85" height="70" rx="4"/><text class="t b" x="707" y="240">bit 2</text>
+  <rect class="cell" x="770" y="200" width="85" height="70" rx="4"/><text class="t b" x="812" y="240">bit 1</text>
+  <rect class="cell" x="875" y="200" width="85" height="70" rx="4"/><text class="t b" x="917" y="240">bit 0</text>
+  <!-- operands in -->
+  <text class="t m" x="602" y="160">a3 b3</text><path class="w" d="M602,166 V198" marker-end="url(#a)"/>
+  <text class="t m" x="707" y="160">a2 b2</text><path class="w" d="M707,166 V198" marker-end="url(#a)"/>
+  <text class="t m" x="812" y="160">a1 b1</text><path class="w" d="M812,166 V198" marker-end="url(#a)"/>
+  <text class="t m" x="917" y="160">a0 b0</text><path class="w" d="M917,166 V198" marker-end="url(#a)"/>
+  <!-- carries -->
+  <path class="w" d="M990,250 H962" marker-end="url(#a)"/><text class="t m" x="976" y="242">cin</text>
+  <path class="w" d="M875,250 H857" marker-end="url(#a)"/><text class="t m" x="865" y="242">c1</text>
+  <path class="w" d="M770,250 H752" marker-end="url(#a)"/><text class="t m" x="760" y="242">c2</text>
+  <path class="w" d="M665,250 H647" marker-end="url(#a)"/><text class="t m" x="655" y="242">c3</text>
+  <path class="w" d="M560,250 H522" marker-end="url(#a)"/><text class="t m" x="538" y="242">cout</text>
+  <!-- results -->
+  <path class="w" d="M602,270 V300" marker-end="url(#a)"/><text class="t m" x="602" y="316">r3</text>
+  <path class="w" d="M707,270 V300" marker-end="url(#a)"/><text class="t m" x="707" y="316">r2</text>
+  <path class="w" d="M812,270 V300" marker-end="url(#a)"/><text class="t m" x="812" y="316">r1</text>
+  <path class="w" d="M917,270 V300" marker-end="url(#a)"/><text class="t m" x="917" y="316">r0</text>
+  <!-- shared op_select -->
+  <path class="ctl" d="M572,345 H947"/>
+  <path class="ctl" d="M572,345 V272" marker-end="url(#g)"/>
+  <path class="ctl" d="M677,345 V272" marker-end="url(#g)"/>
+  <path class="ctl" d="M782,345 V272" marker-end="url(#g)"/>
+  <path class="ctl" d="M887,345 V272" marker-end="url(#g)"/>
+  <text class="t m gc" x="760" y="365">op_select[1:0] (shared)</text>
+
+  <text class="t s" x="745" y="400">alu_8bit uses two slices: Low [3:0] cout → High [7:4] cin, also tapped as AC;</text>
+  <text class="t s" x="745" y="418">High cout → CY. Low cin comes from the Cin select:</text>
+  <text class="t s" x="745" y="436">0 (ADD, DCR, DAA, DAD low) · CY (ADC, DAD high) · 1 (SUB, CMP, INR) · ~CY (SBB)</text>
+</svg>

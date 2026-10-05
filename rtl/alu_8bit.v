@@ -3,58 +3,68 @@
 // Description: Complete 8-bit ALU for the Intel 8085 microprocessor.
 //              This is the top-level combinational ALU datapath.
 //
-//              Architecture (matching project block diagram):
-//              ┌──────────────────────────────────────────────────────┐
-//              │  Accumulator A [7:0]          Temp Reg B [7:0]      │
-//              │       │                            │                │
-//              │       │              ┌─ XOR gates ─┤ (2's comp)     │
-//              │       │              │  2x1 MUX    │                │
-//              │       ▼              ▼             ▼                │
-//              │  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
-//              │  │ 4-bit    │  │ Logic    │  │ Rotate   │          │
-//              │  │ ALU High │  │ Unit     │  │ Unit     │          │
-//              │  │ [7:4]    │  │          │  │          │          │
-//              │  │  ↑ AC    │  │          │  │          │          │
-//              │  │ 4-bit    │  │          │  │          │          │
-//              │  │ ALU Low  │  │          │  │          │          │
-//              │  │ [3:0]    │  │          │  │          │          │
-//              │  └────┬─────┘  └────┬─────┘  └────┬─────┘          │
-//              │       │             │             │                │
-//              │       └──────┬──────┘─────────────┘                │
-//              │              ▼                                      │
-//              │      Operation Select MUX                           │
-//              │              │                                      │
-//              │              ▼                                      │
-//              │     Flag Generator → [S, Z, AC, P, CY]             │
-//              │              │                                      │
-//              │              ▼                                      │
-//              │        Result [7:0]                                 │
-//              └──────────────────────────────────────────────────────┘
+//              Architecture (see docs/alu_8bit_architecture.svg):
 //
-// ALU Operation encoding (alu_op[3:0]):
-//   4'b0000 = ADD   (A + B)
-//   4'b0001 = ADC   (A + B + CY)
-//   4'b0010 = SUB   (A - B)
-//   4'b0011 = SBB   (A - B - CY)
-//   4'b0100 = ANA   (A & B)
-//   4'b0101 = XRA   (A ^ B)
-//   4'b0110 = ORA   (A | B)
-//   4'b0111 = CMP   (A - B, result discarded, flags only)
-//   4'b1000 = RLC   (Rotate left circular)
-//   4'b1001 = RRC   (Rotate right circular)
-//   4'b1010 = RAL   (Rotate left through carry)
-//   4'b1011 = RAR   (Rotate right through carry)
-//   4'b1100 = CMA   (Complement accumulator)
-//   4'b1101 = STC   (Set carry flag)
-//   4'b1110 = CMC   (Complement carry flag)
-//   4'b1111 = INR   (Increment — uses b_in = 0, cin = 1)
+//              A[7:0]                     B[7:0]
+//                │                          │
+//                │                ┌─────────▼──────────┐
+//                │                │ B Operand Select   │  B / ~B / 00h / FFh / DAA corr
+//                │                └─────────┬──────────┘
+//                │                          │ B'[7:0]
+//                ▼                          ▼
+//              ┌──────────────────────────────────────┐
+//              │ 4-bit ALU High [7:4]  (4 × 1-bit)    │──► Cout → CY
+//              │            ▲ AC (Low Cout)            │
+//              │ 4-bit ALU Low  [3:0]  (4 × 1-bit)    │◄── Cin (Carry-in logic)
+//              └──────────────────┬───────────────────┘
+//                                 │ slice_result     ┌──────────────┐
+//                                 │                  │ Rotate Unit  │◄── A, CY
+//                                 │                  └──────┬───────┘
+//                                 ▼                         ▼
+//                        ┌────────────────────────────────────────┐
+//                        │  Result Select: slice / rotate / A     │──► Result[7:0]
+//                        └────────────────────────────────────────┘
+//              Flag Generator (S, Z, P from slice_result) + per-op AC/CY logic
+//              Flags not affected by an operation are passed through from
+//              flags_in, so the flag register can be written unconditionally.
+//
+// ALU Operation encoding (alu_op[4:0]):
+//   5'b00000 = ADD   A + B                 all flags
+//   5'b00001 = ADC   A + B + CY            all flags
+//   5'b00010 = SUB   A - B                 all flags (CY = borrow)
+//   5'b00011 = SBB   A - B - CY            all flags (CY = borrow)
+//   5'b00100 = ANA   A & B                 S,Z,P; AC=1; CY=0
+//   5'b00101 = XRA   A ^ B                 S,Z,P; AC=0; CY=0
+//   5'b00110 = ORA   A | B                 S,Z,P; AC=0; CY=0
+//   5'b00111 = CMP   A - B (flags only)    all flags (CY = borrow)
+//   5'b01000 = RLC   rotate left           CY only
+//   5'b01001 = RRC   rotate right          CY only
+//   5'b01010 = RAL   rotate left thru CY   CY only
+//   5'b01011 = RAR   rotate right thru CY  CY only
+//   5'b01100 = CMA   ~A                    no flags
+//   5'b01101 = STC   CY = 1                CY only
+//   5'b01110 = CMC   CY = ~CY              CY only
+//   5'b01111 = INR   A + 1                 S,Z,AC,P; CY unchanged
+//   5'b10000 = DCR   A - 1                 S,Z,AC,P; CY unchanged
+//   5'b10001 = DAA   decimal adjust A      all flags
+//   5'b10010 = DADL  A + B   (DAD low)     CY only
+//   5'b10011 = DADH  A + B + CY (DAD high) CY only
+//   5'b10100 .. 5'b11111                   reserved: A unchanged, no flags
+//
+// DAD rp (HL <- HL + rp) is a 16-bit add that the 8085 itself performs as
+// two 8-bit ALU passes, which is how it is exposed here:
+//   DADL with A = L, B = rp low   →  L' and CY
+//   DADH with A = H, B = rp high  →  H' and final CY
+//
+// AC on subtraction (SUB/SBB/CMP/DCR) is the carry out of the low nibble of
+// the two's-complement add A + ~B + ~borrow_in, i.e. NOT a half-borrow.
 //=============================================================================
 
 module alu_8bit (
     input  wire [7:0] a,            // Accumulator A [7:0]
     input  wire [7:0] b,            // Temp Register B [7:0]
-    input  wire [3:0] alu_op,       // ALU operation code
-    input  wire       carry_flag,   // Current CY flag (for ADC/SBB/RAL/RAR)
+    input  wire [4:0] alu_op,       // ALU operation code
+    input  wire [4:0] flags_in,     // Current flags {S, Z, AC, P, CY}
     output reg  [7:0] result,       // ALU result [7:0]
     output reg        flag_s,       // Sign flag
     output reg        flag_z,       // Zero flag
@@ -64,22 +74,54 @@ module alu_8bit (
 );
 
     //=========================================================================
+    // Operation codes
+    //=========================================================================
+    localparam [4:0] OP_ADD  = 5'b00000,
+                     OP_ADC  = 5'b00001,
+                     OP_SUB  = 5'b00010,
+                     OP_SBB  = 5'b00011,
+                     OP_ANA  = 5'b00100,
+                     OP_XRA  = 5'b00101,
+                     OP_ORA  = 5'b00110,
+                     OP_CMP  = 5'b00111,
+                     OP_RLC  = 5'b01000,
+                     OP_RRC  = 5'b01001,
+                     OP_RAL  = 5'b01010,
+                     OP_RAR  = 5'b01011,
+                     OP_CMA  = 5'b01100,
+                     OP_STC  = 5'b01101,
+                     OP_CMC  = 5'b01110,
+                     OP_INR  = 5'b01111,
+                     OP_DCR  = 5'b10000,
+                     OP_DAA  = 5'b10001,
+                     OP_DADL = 5'b10010,
+                     OP_DADH = 5'b10011;
+
+    // 1-bit slice op_select encoding
+    localparam [1:0] SEL_AND   = 2'b00,
+                     SEL_OR    = 2'b01,
+                     SEL_XOR   = 2'b10,
+                     SEL_ARITH = 2'b11;
+
+    //=========================================================================
     // Internal signals
     //=========================================================================
 
-    // Arithmetic unit signals
-    wire [7:0] b_mux;              // B after XOR inversion for subtraction
-    wire       arith_cin;          // Carry-in to ALU Low
-    wire [7:0] arith_result;       // Arithmetic result from 4-bit ALU slices
-    wire       aux_carry_out;      // Carry from Low → High (AC flag)
-    wire       carry_out;          // Carry from High (CY flag)
-    wire [1:0] arith_op_select;    // Op select for 4-bit ALU slices
+    wire       carry_flag = flags_in[0];   // Current CY flag
+    wire       aux_flag   = flags_in[2];   // Current AC flag (for DAA)
 
-    // Logic unit: direct bitwise operations on full 8-bit width
-    wire [7:0] and_result;
-    wire [7:0] or_result;
-    wire [7:0] xor_result;
-    wire [7:0] cma_result;
+    // DAA correction: +06h if the low digit is invalid or AC is set,
+    // +60h if the whole byte is above 99h or CY is set (which also sets CY)
+    wire       daa_lo   = (a[3:0] > 4'd9) | aux_flag;
+    wire       daa_hi   = (a > 8'h99)     | carry_flag;
+    wire [7:0] daa_corr = {1'b0, daa_hi, daa_hi, 1'b0, 1'b0, daa_lo, daa_lo, 1'b0};
+
+    reg  [7:0] b_operand;          // B after operand select (B / ~B / 00h / FFh)
+    reg        slice_cin;          // Carry-in to ALU Low
+    reg  [1:0] slice_op_select;    // Op select for all 8 bit-slices
+    wire [7:0] slice_result;       // Result from the two 4-bit ALU slices
+    wire       aux_carry_out;      // Carry from Low → High (AC flag)
+    wire       carry_out;          // Carry from High (CY before borrow fix-up)
 
     // Rotate unit signals
     wire [7:0] rotate_result;
@@ -89,73 +131,65 @@ module alu_8bit (
     wire       fg_s, fg_z, fg_ac, fg_p, fg_cy;
 
     //=========================================================================
-    // Subtraction control: B inversion + Carry-in
+    // Slice control: B operand select, carry-in, op_select
     //=========================================================================
-
-    // is_subtract: SUB (0010), SBB (0011), CMP (0111)
-    wire is_subtract;
-    assign is_subtract = (alu_op == 4'b0010) || (alu_op == 4'b0011) || (alu_op == 4'b0111);
-
-    // 2x1 MUX + XOR gates: invert B for subtraction (2's complement)
-    assign b_mux = is_subtract ? ~b : b;
-
-    // Carry-in logic:
-    //   ADD:  Cin = 0
-    //   ADC:  Cin = CY flag
-    //   SUB:  Cin = 1 (completes 2's complement)
-    //   SBB:  Cin = ~CY flag (borrow = complement of carry for subtraction)
-    //   CMP:  Cin = 1 (same as SUB)
-    //   INR:  Cin = 1 (increment by 1)
-    //   Others: Cin = 0
-    reg arith_cin_reg;
+    //   ADD/ADC     : B,   Cin = 0 / CY,      FA sum
+    //   SUB/CMP     : ~B,  Cin = 1,           FA sum  (A + ~B + 1 = A - B)
+    //   SBB         : ~B,  Cin = ~CY,         FA sum  (A + ~B + ~CY = A - B - CY)
+    //   INR         : 00h, Cin = 1,           FA sum  (A + 0 + 1)
+    //   DCR         : FFh, Cin = 0,           FA sum  (A + FFh = A - 1)
+    //   DAA         : 00h/06h/60h/66h, Cin=0, FA sum  (A + correction)
+    //   DADL / DADH : B,   Cin = 0 / CY,      FA sum  (same as ADD / ADC)
+    //   ANA/ORA/XRA : B,   Cin = 0,           AND / OR / XOR
+    //   CMA         : FFh, Cin = 0,           XOR     (A ^ FFh = ~A)
+    //   Others      : B,   Cin = 0,           FA sum  (slice output unused)
     always @(*) begin
+        b_operand       = b;
+        slice_cin       = 1'b0;
+        slice_op_select = SEL_ARITH;
+
         case (alu_op)
-            4'b0000: arith_cin_reg = 1'b0;          // ADD: no carry-in
-            4'b0001: arith_cin_reg = carry_flag;     // ADC: carry-in = CY
-            4'b0010: arith_cin_reg = 1'b1;           // SUB: Cin=1 for 2's comp
-            4'b0011: arith_cin_reg = ~carry_flag;    // SBB: Cin = ~CY (borrow)
-            4'b0111: arith_cin_reg = 1'b1;           // CMP: same as SUB
-            4'b1111: arith_cin_reg = 1'b1;           // INR: increment
-            default: arith_cin_reg = 1'b0;
+            OP_ADD: ;
+            OP_ADC: slice_cin = carry_flag;
+            OP_SUB: begin b_operand = ~b; slice_cin = 1'b1;        end
+            OP_SBB: begin b_operand = ~b; slice_cin = ~carry_flag; end
+            OP_CMP: begin b_operand = ~b; slice_cin = 1'b1;        end
+            OP_INR: begin b_operand = 8'h00; slice_cin = 1'b1;     end
+            OP_DCR: b_operand = 8'hFF;
+            OP_DAA: b_operand = daa_corr;
+            OP_DADL: ;
+            OP_DADH: slice_cin = carry_flag;
+            OP_ANA: slice_op_select = SEL_AND;
+            OP_ORA: slice_op_select = SEL_OR;
+            OP_XRA: slice_op_select = SEL_XOR;
+            OP_CMA: begin b_operand = 8'hFF; slice_op_select = SEL_XOR; end
+            default: ;
         endcase
     end
-    assign arith_cin = arith_cin_reg;
-
-    // For arithmetic operations, the 4-bit ALU slices use op_select = 2'b11 (FA Sum)
-    assign arith_op_select = 2'b11;
 
     //=========================================================================
-    // Arithmetic Unit: Two cascaded 4-bit ALU slices
+    // Bit-slice datapath: two cascaded 4-bit ALU slices
     //=========================================================================
 
     // 4-bit ALU Low [3:0]
     alu_4bit alu_low (
         .a         (a[3:0]),
-        .b         (b_mux[3:0]),
-        .cin       (arith_cin),
-        .op_select (arith_op_select),
-        .result    (arith_result[3:0]),
+        .b         (b_operand[3:0]),
+        .cin       (slice_cin),
+        .op_select (slice_op_select),
+        .result    (slice_result[3:0]),
         .cout      (aux_carry_out)          // This IS the Auxiliary Carry (AC)
     );
 
     // 4-bit ALU High [7:4]
     alu_4bit alu_high (
         .a         (a[7:4]),
-        .b         (b_mux[7:4]),
+        .b         (b_operand[7:4]),
         .cin       (aux_carry_out),         // Carry chain: Low → High
-        .op_select (arith_op_select),
-        .result    (arith_result[7:4]),
-        .cout      (carry_out)              // This IS the Carry flag (CY)
+        .op_select (slice_op_select),
+        .result    (slice_result[7:4]),
+        .cout      (carry_out)              // Carry out of bit 7
     );
-
-    //=========================================================================
-    // Logic Unit: bitwise operations (AND, OR, XOR, CMA)
-    //=========================================================================
-
-    assign and_result = a & b;
-    assign or_result  = a | b;
-    assign xor_result = a ^ b;
-    assign cma_result = ~a;                 // Complement Accumulator
 
     //=========================================================================
     // Rotate Unit
@@ -170,13 +204,11 @@ module alu_8bit (
     );
 
     //=========================================================================
-    // Flag Generator (for the selected result)
+    // Flag Generator (S, Z, P from the slice result; AC/CY from the carries)
     //=========================================================================
 
-    // We compute flags on the arithmetic result; they get overridden
-    // for logic/rotate/special ops below
     flag_generator flag_gen (
-        .result    (arith_result),
+        .result    (slice_result),
         .carry_out (carry_out),
         .aux_carry (aux_carry_out),
         .flag_s    (fg_s),
@@ -191,116 +223,67 @@ module alu_8bit (
     //=========================================================================
 
     always @(*) begin
-        // Defaults
-        result  = 8'h00;
-        flag_s  = fg_s;
-        flag_z  = fg_z;
-        flag_ac = fg_ac;
-        flag_p  = fg_p;
-        flag_cy = fg_cy;
+        // Defaults: result = A, every flag unchanged (also reserved ops)
+        result = a;
+        {flag_s, flag_z, flag_ac, flag_p, flag_cy} = flags_in;
 
         case (alu_op)
-            // --- Arithmetic operations ---
-            4'b0000: begin  // ADD
-                result  = arith_result;
+            // --- Addition: all flags ---
+            OP_ADD, OP_ADC: begin
+                result = slice_result;
+                {flag_s, flag_z, flag_ac, flag_p, flag_cy} = {fg_s, fg_z, fg_ac, fg_p, fg_cy};
             end
 
-            4'b0001: begin  // ADC
-                result  = arith_result;
+            // --- Subtraction: all flags, CY = borrow = ~carry-out ---
+            OP_SUB, OP_SBB, OP_CMP: begin
+                result = slice_result;          // CMP: discarded by the controller
+                {flag_s, flag_z, flag_ac, flag_p, flag_cy} = {fg_s, fg_z, fg_ac, fg_p, ~fg_cy};
             end
 
-            4'b0010: begin  // SUB
-                result  = arith_result;
+            // --- Increment / decrement: CY not affected ---
+            OP_INR, OP_DCR: begin
+                result = slice_result;
+                {flag_s, flag_z, flag_ac, flag_p} = {fg_s, fg_z, fg_ac, fg_p};
             end
 
-            4'b0011: begin  // SBB
-                result  = arith_result;
+            // --- Decimal adjust: AC from the low-digit correction carry,
+            //     CY set by the high-digit correction (never cleared) ---
+            OP_DAA: begin
+                result = slice_result;
+                {flag_s, flag_z, flag_ac, flag_p, flag_cy} = {fg_s, fg_z, fg_ac, fg_p, daa_hi};
             end
 
-            4'b0111: begin  // CMP (same as SUB but result is discarded externally)
-                result  = arith_result;
+            // --- DAD halves: only CY affected ---
+            OP_DADL, OP_DADH: begin
+                result  = slice_result;
+                flag_cy = fg_cy;
             end
 
-            4'b1111: begin  // INR (increment; CY is NOT affected)
-                result  = arith_result;
-                flag_cy = carry_flag;       // CY unchanged for INR
+            // --- Logical: S, Z, P from result; AC fixed; CY reset ---
+            OP_ANA: begin
+                result = slice_result;
+                {flag_s, flag_z, flag_ac, flag_p, flag_cy} = {fg_s, fg_z, 1'b1, fg_p, 1'b0};
             end
 
-            // --- Logical operations ---
-            4'b0100: begin  // ANA (AND)
-                result  = and_result;
-                flag_s  = and_result[7];
-                flag_z  = (and_result == 8'h00);
-                flag_ac = 1'b1;             // AC is set to 1 for ANA
-                flag_p  = ~(^and_result);
-                flag_cy = 1'b0;             // CY reset
+            OP_XRA, OP_ORA: begin
+                result = slice_result;
+                {flag_s, flag_z, flag_ac, flag_p, flag_cy} = {fg_s, fg_z, 1'b0, fg_p, 1'b0};
             end
 
-            4'b0101: begin  // XRA (XOR)
-                result  = xor_result;
-                flag_s  = xor_result[7];
-                flag_z  = (xor_result == 8'h00);
-                flag_ac = 1'b0;             // AC reset
-                flag_p  = ~(^xor_result);
-                flag_cy = 1'b0;             // CY reset
-            end
-
-            4'b0110: begin  // ORA (OR)
-                result  = or_result;
-                flag_s  = or_result[7];
-                flag_z  = (or_result == 8'h00);
-                flag_ac = 1'b0;             // AC reset
-                flag_p  = ~(^or_result);
-                flag_cy = 1'b0;             // CY reset
-            end
-
-            // --- Rotate operations (only CY affected) ---
-            4'b1000: begin  // RLC
-                result  = rotate_result;
-                flag_s  = carry_flag ? fg_s : fg_s;  // S,Z,AC,P unchanged
-                flag_z  = carry_flag ? fg_z : fg_z;  // (preserve current flags)
-                flag_cy = rotate_carry;
-            end
-
-            4'b1001: begin  // RRC
+            // --- Rotate: only CY affected ---
+            OP_RLC, OP_RRC, OP_RAL, OP_RAR: begin
                 result  = rotate_result;
                 flag_cy = rotate_carry;
             end
 
-            4'b1010: begin  // RAL
-                result  = rotate_result;
-                flag_cy = rotate_carry;
-            end
+            // --- Complement accumulator: no flags affected ---
+            OP_CMA: result = slice_result;
 
-            4'b1011: begin  // RAR
-                result  = rotate_result;
-                flag_cy = rotate_carry;
-            end
+            // --- Carry flag operations: A unchanged ---
+            OP_STC: flag_cy = 1'b1;
+            OP_CMC: flag_cy = ~carry_flag;
 
-            // --- Special operations ---
-            4'b1100: begin  // CMA (complement accumulator; no flags affected)
-                result  = cma_result;
-                flag_s  = fg_s;     // Flags unchanged — will be overridden
-                flag_z  = fg_z;     // by the top module preserving old flags
-                flag_ac = fg_ac;
-                flag_p  = fg_p;
-                flag_cy = carry_flag;
-            end
-
-            4'b1101: begin  // STC (set carry)
-                result  = a;        // Accumulator unchanged
-                flag_cy = 1'b1;
-            end
-
-            4'b1110: begin  // CMC (complement carry)
-                result  = a;        // Accumulator unchanged
-                flag_cy = ~carry_flag;
-            end
-
-            default: begin
-                result  = 8'h00;
-                flag_cy = carry_flag;
-            end
+            default: ;
         endcase
     end
 

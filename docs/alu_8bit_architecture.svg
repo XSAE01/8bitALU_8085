@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="800" viewBox="0 0 1000 800" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker>
+    <style>
+      .blk  { fill: #e8f0fe; stroke: #1a73e8; stroke-width: 2; }
+      .slc  { fill: #fff4e5; stroke: #e67e22; stroke-width: 2; }
+      .mux  { fill: #f4ecf7; stroke: #8e44ad; stroke-width: 2; }
+      .flg  { fill: #fdecea; stroke: #c0392b; stroke-width: 2; }
+      .dec  { fill: #e9f7ef; stroke: #1e8449; stroke-width: 2; }
+      .w    { stroke: #333; stroke-width: 2; fill: none; }
+      .t    { text-anchor: middle; }
+      .b    { font-weight: bold; }
+      .s    { font-size: 12px; }
+      .m    { font-family: Consolas, Menlo, monospace; font-size: 12px; }
+      .tag  { font-style: italic; font-size: 12px; fill: #1e8449; }
+    </style>
+  </defs>
+  <rect width="1000" height="800" fill="#ffffff"/>
+  <text x="20" y="30" font-size="20" class="b">alu_8bit — 8-bit ALU datapath (combinational)</text>
+
+  <!-- Inputs -->
+  <text class="t m" x="200" y="68">A[7:0]</text><path class="w" d="M200,74 V215"/>
+  <text class="t m" x="470" y="68">B[7:0]</text><path class="w" d="M470,74 V118" marker-end="url(#a)"/>
+
+  <!-- B operand select -->
+  <polygon class="mux" points="380,120 620,120 590,175 410,175"/>
+  <text class="t b" x="500" y="142">B operand select</text>
+  <text class="t s" x="500" y="162">B · ~B · 00h · FFh · DAA corr</text>
+
+  <!-- DAA correction -->
+  <rect class="blk" x="660" y="100" width="210" height="85" rx="4"/>
+  <text class="t b" x="765" y="122">DAA correction</text>
+  <text class="t s" x="765" y="141">+06h if A[3:0] &gt; 9 or AC</text>
+  <text class="t s" x="765" y="158">+60h if A &gt; 99h or CY (sets CY)</text>
+  <text class="t tag" x="765" y="176">in: A, flags_in.AC, flags_in.CY</text>
+  <path class="w" d="M660,145 H609" marker-end="url(#a)"/><text class="m" x="622" y="138">corr</text>
+
+  <!-- B' bus and A bus to slices -->
+  <path class="w" d="M500,175 V200 H650"/><path class="w" d="M350,200 H500"/>
+  <path class="w" d="M350,200 V248" marker-end="url(#a)"/>
+  <path class="w" d="M650,200 V248" marker-end="url(#a)"/>
+  <text class="m" x="590" y="195">B'</text>
+  <path class="w" d="M200,215 H530"/>
+  <path class="w" d="M230,215 V248" marker-end="url(#a)"/>
+  <path class="w" d="M530,215 V248" marker-end="url(#a)"/>
+
+  <!-- Slices -->
+  <rect class="slc" x="180" y="250" width="240" height="90" rx="4"/>
+  <text class="m" x="204" y="267">A[7:4]</text><text class="m" x="356" y="267">B'[7:4]</text>
+  <text class="t b" x="300" y="296">4-bit ALU High [7:4]</text>
+  <text class="t s" x="300" y="316">alu_4bit = 4 × alu_1bit_slice</text>
+  <rect class="slc" x="480" y="250" width="240" height="90" rx="4"/>
+  <text class="m" x="504" y="267">A[3:0]</text><text class="m" x="656" y="267">B'[3:0]</text>
+  <text class="t b" x="600" y="296">4-bit ALU Low [3:0]</text>
+  <text class="t s" x="600" y="316">alu_4bit = 4 × alu_1bit_slice</text>
+  <!-- Carries -->
+  <path class="w" d="M480,300 H422" marker-end="url(#a)"/><text class="t m" x="451" y="292">AC</text>
+  <path class="w" d="M180,300 H120 V428" marker-end="url(#a)"/><text class="m" x="118" y="292">Cout</text>
+
+  <!-- Cin select -->
+  <rect class="mux" x="760" y="270" width="160" height="60" rx="4"/>
+  <text class="t b" x="840" y="293">Cin select</text>
+  <text class="t s" x="840" y="313">0 · 1 · CY · ~CY</text>
+  <path class="w" d="M760,300 H722" marker-end="url(#a)"/>
+  <text class="t tag" x="840" y="347">in: flags_in.CY</text>
+  <text class="t s" x="450" y="362" fill="#555">op_select (shared by all 8 cells): AND · OR · XOR · ADD</text>
+
+  <!-- slice_result -->
+  <path class="w" d="M300,340 V390 H600 V340"/>
+  <text class="t m" x="450" y="384">slice_result[7:0]</text>
+  <path class="w" d="M300,390 V428" marker-end="url(#a)"/>
+  <path class="w" d="M450,390 V598" marker-end="url(#a)"/>
+
+  <!-- Flag generator -->
+  <rect class="flg" x="60" y="430" width="260" height="100" rx="4"/>
+  <text class="t b" x="190" y="452">flag_generator</text>
+  <text class="t s" x="190" y="472">S = r[7]   ·   Z = (r == 00h)</text>
+  <text class="t s" x="190" y="490">P = ~^r  (even parity)</text>
+  <text class="t s" x="190" y="508">AC = Low carry · CY = High carry</text>
+  <path class="w" d="M190,530 V598" marker-end="url(#a)"/>
+
+  <!-- Rotate unit -->
+  <rect class="blk" x="680" y="430" width="260" height="100" rx="4"/>
+  <text class="t b" x="810" y="452">rotate_unit</text>
+  <text class="t s" x="810" y="472">RLC · RRC · RAL · RAR</text>
+  <text class="t tag" x="810" y="490">in: A, flags_in.CY, alu_op[1:0]</text>
+  <text class="t s" x="810" y="508">out: rotated A, rotate carry</text>
+  <path class="w" d="M760,530 V570 H560 V598" marker-end="url(#a)"/>
+
+  <!-- Result select -->
+  <polygon class="mux" points="380,600 620,600 590,660 410,660"/>
+  <text class="t b" x="500" y="625">result select</text>
+  <text class="t s" x="500" y="645">slice_result · rotated A · A</text>
+  <text class="t tag" x="560" y="590"> </text>
+  <path class="w" d="M500,660 V698" marker-end="url(#a)"/>
+  <text class="t m b" x="500" y="716">result[7:0]</text>
+
+  <!-- Flag select -->
+  <rect class="flg" x="40" y="600" width="300" height="120" rx="4"/>
+  <text class="t b" x="190" y="622">flag select (per operation)</text>
+  <text class="t s" x="190" y="642">generated S, Z, AC, P, CY</text>
+  <text class="t s" x="190" y="660">CY = ~Cout (borrow) for SUB/SBB/CMP</text>
+  <text class="t s" x="190" y="678">rotate carry · AC = 1/0 for logic ops</text>
+  <text class="t s" x="190" y="696">STC/CMC/DAA CY · unaffected = flags_in</text>
+  <path class="w" d="M190,720 V748" marker-end="url(#a)"/>
+  <text class="t m b" x="190" y="766">flag_s, flag_z, flag_ac, flag_p, flag_cy</text>
+
+  <!-- Opcode decode -->
+  <rect class="dec" x="680" y="600" width="260" height="120" rx="4"/>
+  <text class="t b" x="810" y="622">opcode decode</text>
+  <text class="t s" x="810" y="642">→ B operand select, Cin select</text>
+  <text class="t s" x="810" y="660">→ op_select (AND/OR/XOR/ADD)</text>
+  <text class="t s" x="810" y="678">→ result select, flag select</text>
+  <text class="t s" x="810" y="696">reserved codes: A and flags unchanged</text>
+  <path class="w" d="M995,660 H942" marker-end="url(#a)"/>
+  <text class="m" x="944" y="652" text-anchor="start">alu_op</text>
+
+  <text x="20" y="792" class="s" fill="#555">Green italic “in:” tags are inputs shown by name instead of wires. flags_in = {S, Z, AC, P, CY} from the flag register.</text>
+</svg>

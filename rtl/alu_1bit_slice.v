@@ -7,8 +7,11 @@
 // Op Select encoding:
 //   2'b00 = AND (ANA/ANI)
 //   2'b01 = OR  (ORA/ORI)
-//   2'b10 = XOR (XRA/XRI)
-//   2'b11 = Arithmetic (ADD/ADC/SUB/SBB/CMP/INR/DCR)
+//   2'b10 = XOR (XRA/XRI, and CMA with B forced to FFh)
+//   2'b11 = Arithmetic (ADD/ADC/SUB/SBB/CMP/INR)
+//
+// cout is always the Full Adder carry; it is only meaningful when
+// op_select = 2'b11 (the 8-bit ALU ignores it for logic operations).
 //=============================================================================
 
 module alu_1bit_slice (

@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="570" viewBox="0 0 1000 570" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker>
+    <marker id="g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1e8449"/></marker>
+    <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/></marker>
+    <style>
+      .reg  { fill: #e8f0fe; stroke: #1a73e8; stroke-width: 2; }
+      .alu  { fill: #fff4e5; stroke: #e67e22; stroke-width: 2; }
+      .fsm  { fill: #e9f7ef; stroke: #1e8449; stroke-width: 2; }
+      .flg  { fill: #fdecea; stroke: #c0392b; stroke-width: 2; }
+      .w    { stroke: #333; stroke-width: 2; fill: none; }
+      .ctl  { stroke: #1e8449; stroke-width: 1.6; fill: none; stroke-dasharray: 6 4; }
+      .fb   { stroke: #c0392b; stroke-width: 2; fill: none; }
+      .t    { text-anchor: middle; }
+      .b    { font-weight: bold; }
+      .s    { font-size: 12px; }
+      .m    { font-family: Consolas, Menlo, monospace; font-size: 12px; }
+      .gc   { fill: #1e8449; }
+      .rc   { fill: #c0392b; }
+    </style>
+  </defs>
+  <rect width="1000" height="570" fill="#ffffff"/>
+  <text x="20" y="30" font-size="20" class="b">alu_8085_top — 8085 ALU subsystem</text>
+
+  <!-- Registers -->
+  <rect class="reg" x="170" y="95" width="170" height="50" rx="4"/>
+  <text class="t b" x="255" y="117">Accumulator A</text><text class="t s" x="255" y="135">[7:0]</text>
+  <rect class="reg" x="420" y="95" width="170" height="50" rx="4"/>
+  <text class="t b" x="505" y="117">Temp Register B</text><text class="t s" x="505" y="135">[7:0]</text>
+  <rect class="reg" x="670" y="95" width="170" height="50" rx="4"/>
+  <text class="t b" x="755" y="117">Opcode Register</text><text class="t s" x="755" y="135">[4:0]</text>
+
+  <!-- Inputs into registers -->
+  <text class="t m" x="225" y="62">data_in_a</text><path class="w" d="M225,68 V93" marker-end="url(#a)"/>
+  <text class="t m" x="505" y="62">data_in_b</text><path class="w" d="M505,68 V93" marker-end="url(#a)"/>
+  <text class="t m" x="755" y="62">alu_op_in[4:0]</text><path class="w" d="M755,68 V93" marker-end="url(#a)"/>
+  <!-- acc_out stub -->
+  <path class="w" d="M310,95 V70" marker-end="url(#a)"/><text class="t m" x="310" y="62">acc_out</text>
+
+  <!-- FSM -->
+  <rect class="fsm" x="20" y="250" width="150" height="190" rx="6"/>
+  <text class="t b" x="95" y="274">fsm_controller</text>
+  <text class="t s" x="95" y="298">S0 IDLE</text>
+  <text class="t s" x="95" y="316">S1 LOAD_A</text>
+  <text class="t s" x="95" y="334">S2 LOAD_B</text>
+  <text class="t s" x="95" y="352">S3 LOAD_OP</text>
+  <text class="t s" x="95" y="370">S4 EXECUTE</text>
+  <text class="t s" x="95" y="388">S5 DONE</text>
+  <text class="t s" x="95" y="414" fill="#555">see fsm_controller.svg</text>
+  <!-- clk / rst / start -->
+  <text class="t m" x="45" y="530">clk</text><path class="w" d="M45,515 V442" marker-end="url(#a)"/>
+  <text class="t m" x="95" y="530">rst</text><path class="w" d="M95,515 V442" marker-end="url(#a)"/>
+  <text class="t m" x="145" y="530">start</text><path class="w" d="M145,515 V442" marker-end="url(#a)"/>
+  <!-- done / state_out stub -->
+  <path class="w" d="M170,425 H200" marker-end="url(#a)"/><text class="m" x="205" y="429">done, state_out</text>
+
+  <!-- Control bus -->
+  <path class="ctl" d="M50,250 V180 H900 V480 H862" marker-end="url(#g)"/>
+  <path class="ctl" d="M325,180 V147" marker-end="url(#g)"/><text class="s gc" x="331" y="170">load_a, acc_wr</text>
+  <path class="ctl" d="M445,180 V147" marker-end="url(#g)"/><text class="s gc" x="451" y="170">load_b</text>
+  <path class="ctl" d="M695,180 V147" marker-end="url(#g)"/><text class="s gc" x="701" y="170">load_op</text>
+  <text class="s gc" x="906" y="330">flag_wr</text>
+  <text class="s gc" x="56" y="200">control</text>
+
+  <!-- Register outputs to ALU -->
+  <path class="w" d="M280,145 V258" marker-end="url(#a)"/>
+  <path class="w" d="M505,145 V258" marker-end="url(#a)"/>
+  <path class="w" d="M780,145 V258" marker-end="url(#a)"/>
+  <!-- latched opcode back to FSM (CMP decision) -->
+  <path class="w" d="M820,145 V215 H120 V248" marker-end="url(#a)"/>
+  <text class="s" x="560" y="209">latched alu_op (FSM skips the A write for CMP)</text>
+
+  <!-- ALU -->
+  <rect class="alu" x="210" y="260" width="650" height="110" rx="6"/>
+  <text class="m" x="270" y="280">a</text><text class="m" x="495" y="280">b</text><text class="m" x="738" y="280">alu_op</text>
+  <text class="t b" x="535" y="318">alu_8bit (combinational)</text>
+  <text class="t s" x="535" y="340">operand select · 2 × 4-bit slices · rotate unit · flag logic — see alu_8bit_architecture.svg</text>
+
+  <!-- Result write-back -->
+  <path class="w" d="M240,370 V400 H190 V147" marker-end="url(#a)"/>
+  <text class="m" x="248" y="395">result → A (on acc_wr)</text>
+
+  <!-- Flags -->
+  <path class="w" d="M780,370 V448" marker-end="url(#a)"/>
+  <text class="m" x="788" y="415">new S Z AC P CY</text>
+  <rect class="flg" x="620" y="450" width="240" height="60" rx="4"/>
+  <text class="t b" x="740" y="474">Flag Register</text>
+  <text class="t s" x="740" y="495">S · Z · AC · P · CY</text>
+  <path class="fb" d="M620,480 H560 V372" marker-end="url(#r)"/>
+  <text class="m rc" x="480" y="415">flags_in</text>
+  <path class="w" d="M740,510 V535" marker-end="url(#a)"/>
+  <text class="t m" x="740" y="553">flags_out, flag_reg_out</text>
+</svg>

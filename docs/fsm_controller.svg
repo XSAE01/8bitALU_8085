@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="480" viewBox="0 0 900 480" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333"/></marker>
+    <style>
+      .st   { fill: #e9f7ef; stroke: #1e8449; stroke-width: 2.5; }
+      .w    { stroke: #333; stroke-width: 2; fill: none; }
+      .t    { text-anchor: middle; }
+      .b    { font-weight: bold; }
+      .s    { font-size: 12px; }
+      .m    { font-family: Consolas, Menlo, monospace; font-size: 12px; }
+      .o    { font-family: Consolas, Menlo, monospace; font-size: 11px; fill: #1a5276; }
+    </style>
+  </defs>
+  <rect width="900" height="480" fill="#ffffff"/>
+  <text x="20" y="30" font-size="20" class="b">fsm_controller — state diagram</text>
+
+  <!-- States (outputs listed under the name; all others are 0) -->
+  <circle class="st" cx="130" cy="170" r="55"/>
+  <text class="t b" x="130" y="164">S0</text><text class="t s" x="130" y="182">IDLE</text>
+
+  <circle class="st" cx="340" cy="170" r="55"/>
+  <text class="t b" x="340" y="158">S1</text><text class="t s" x="340" y="175">LOAD_A</text><text class="t o" x="340" y="194">load_a</text>
+
+  <circle class="st" cx="550" cy="170" r="55"/>
+  <text class="t b" x="550" y="158">S2</text><text class="t s" x="550" y="175">LOAD_B</text><text class="t o" x="550" y="194">load_b</text>
+
+  <circle class="st" cx="760" cy="170" r="55"/>
+  <text class="t b" x="760" y="158">S3</text><text class="t s" x="760" y="175">LOAD_OP</text><text class="t o" x="760" y="194">load_op</text>
+
+  <circle class="st" cx="760" cy="380" r="55"/>
+  <text class="t b" x="760" y="356">S4</text><text class="t s" x="760" y="373">EXECUTE</text>
+  <text class="t o" x="760" y="391">flag_wr</text><text class="t o" x="760" y="406">acc_wr (≠CMP)</text>
+
+  <circle class="st" cx="130" cy="380" r="55"/>
+  <text class="t b" x="130" y="368">S5</text><text class="t s" x="130" y="385">DONE</text><text class="t o" x="130" y="404">done</text>
+
+  <!-- Reset -->
+  <path class="w" d="M20,170 H73" marker-end="url(#a)"/><text class="m" x="22" y="160">rst</text>
+  <!-- S0 self-loop -->
+  <path class="w" d="M108,120 C 80,62 180,62 152,120" marker-end="url(#a)"/>
+  <text class="t m" x="130" y="64">!start</text>
+  <!-- Transitions -->
+  <path class="w" d="M185,170 H283" marker-end="url(#a)"/><text class="t m" x="234" y="160">start</text>
+  <path class="w" d="M395,170 H493" marker-end="url(#a)"/>
+  <path class="w" d="M605,170 H703" marker-end="url(#a)"/>
+  <path class="w" d="M760,225 V323" marker-end="url(#a)"/>
+  <path class="w" d="M705,380 H187" marker-end="url(#a)"/>
+  <path class="w" d="M130,325 V227" marker-end="url(#a)"/>
+
+  <!-- Notes -->
+  <text class="t s" x="445" y="262">Moves one state per rising clk edge; registers load on the edge that leaves a state.</text>
+  <text class="t s" x="445" y="282">S4 → S5 edge: A ← result (except CMP) and flags ← new flags, both from the latched opcode.</text>
+  <text class="t s" x="445" y="302">rst is synchronous. Unused state codes 6 and 7 go to S0.</text>
+  <text class="t s" x="445" y="455">One operation: start sampled in S0, then S1 → S5 → S0 (6 clocks from start to idle).</text>
+</svg>

@@ -53,7 +53,7 @@ if "%1"=="alu_4bit" goto end
 
 :run_alu_8bit
 echo ------ 8-bit ALU Test ------
-iverilog -o %OUT_DIR%\tb_alu_8bit.vvp %RTL_FILES% %TB_DIR%\tb_alu_8bit.v
+iverilog -I %TB_DIR% -o %OUT_DIR%\tb_alu_8bit.vvp %RTL_FILES% %TB_DIR%\tb_alu_8bit.v
 if errorlevel 1 (echo [ERROR] Compilation failed! & goto next3)
 cd %OUT_DIR% && vvp tb_alu_8bit.vvp && cd ..
 :next3
@@ -62,7 +62,7 @@ if "%1"=="alu_8bit" goto end
 
 :run_alu_8085_top
 echo ------ 8085 ALU Top Integration Test ------
-iverilog -o %OUT_DIR%\tb_alu_8085_top.vvp %RTL_FILES% %TB_DIR%\tb_alu_8085_top.v
+iverilog -I %TB_DIR% -o %OUT_DIR%\tb_alu_8085_top.vvp %RTL_FILES% %TB_DIR%\tb_alu_8085_top.v
 if errorlevel 1 (echo [ERROR] Compilation failed! & goto next4)
 cd %OUT_DIR% && vvp tb_alu_8085_top.vvp && cd ..
 :next4

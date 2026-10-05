@@ -4,21 +4,37 @@
 //              controller, Accumulator register, Temp register, and Flag
 //              register — the complete 8085 ALU subsystem.
 //
-//              ┌──────────────────────────────────────────────────────┐
-//              │                    alu_8085_top                      │
-//              │                                                      │
-//              │  ┌──────────────┐         ┌──────────────┐          │
-//              │  │ FSM          │ control │              │          │
-//              │  │ Controller   │────────►│   8-bit ALU  │          │
-//              │  │ (S0→S5)      │         │  (alu_8bit)  │          │
-//              │  │              │◄────────│              │          │
-//              │  └──────────────┘  flags  └──────┬───────┘          │
-//              │                                   │                  │
-//              │  ┌────────────┐  ┌────────────┐  │                  │
-//              │  │ Acc Reg    │  │ Flag Reg   │◄─┘                  │
-//              │  │ A [7:0]   │  │ S,Z,AC,P,CY│                     │
-//              │  └────────────┘  └────────────┘                     │
-//              └──────────────────────────────────────────────────────┘
+//              ┌───────────────────────────────────────────────────────────┐
+//              │                       alu_8085_top                        │
+//              │                                                           │
+//              │  ┌──────────────┐ load_a/load_b/load_op/acc_wr/flag_wr    │
+//              │  │ FSM          │──────────► registers below              │
+//              │  │ Controller   │                                         │
+//              │  │ (S0→S5)      │◄── alu_op_reg (latched opcode)          │
+//              │  └──────────────┘                                         │
+//              │                                                           │
+//              │  ┌────────────┐  ┌────────────┐  ┌────────────┐           │
+//              │  │ Acc Reg    │  │ Temp Reg B │  │ Op Reg     │           │
+//              │  │ A [7:0]    │  │ B [7:0]    │  │ [4:0]      │           │
+//              │  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘           │
+//              │        ▼               ▼               ▼                  │
+//              │  ┌─────────────────────────────────────────────┐          │
+//              │  │                8-bit ALU (alu_8bit)         │◄── flags │
+//              │  └──────────┬───────────────────────┬──────────┘          │
+//              │      result │ (→ Acc on acc_wr)     │ new flags           │
+//              │             ▼                       ▼                     │
+//              │        Acc Reg A           ┌────────────────┐             │
+//              │                            │ Flag Reg       │─────────────┤
+//              │                            │ S,Z,AC,P,CY    │  (flags_in) │
+//              │                            └────────────────┘             │
+//              └───────────────────────────────────────────────────────────┘
+//
+//              One operation takes 6 clock cycles: S0 → S1 (load A) →
+//              S2 (load B) → S3 (latch opcode) → S4 (write result + flags)
+//              → S5 (done) → S0.
+//
+//              DAD rp is issued as two operations: DADL (A = L, B = rp low)
+//              then DADH (A = H, B = rp high); see alu_8bit.
 //=============================================================================
 
 module alu_8085_top (
@@ -27,10 +43,10 @@ module alu_8085_top (
     input  wire       start,        // Start ALU operation
     input  wire [7:0] data_in_a,    // Data input for Accumulator
     input  wire [7:0] data_in_b,    // Data input for Temp Register B
-    input  wire [3:0] alu_op_in,    // ALU operation code
+    input  wire [4:0] alu_op_in,    // ALU operation code (see alu_8bit)
     output wire [7:0] acc_out,      // Accumulator output
-    output wire [7:0] result_out,   // ALU result (direct)
     output wire [4:0] flags_out,    // Flags: {S, Z, AC, P, CY}
+    output wire [7:0] flag_reg_out, // 8085 flag register: {S, Z, 0, AC, 0, P, 0, CY}
     output wire       done,         // Operation complete
     output wire [2:0] state_out     // FSM state (for debug)
 );
@@ -43,7 +59,6 @@ module alu_8085_top (
     wire        ctrl_load_a;
     wire        ctrl_load_b;
     wire        ctrl_load_op;
-    wire        ctrl_execute;
     wire        ctrl_done;
     wire        ctrl_acc_wr;
     wire        ctrl_flag_wr;
@@ -51,7 +66,7 @@ module alu_8085_top (
     // Registered operands and opcode
     reg  [7:0]  acc_reg;            // Accumulator register
     reg  [7:0]  temp_b_reg;         // Temp register B
-    reg  [3:0]  alu_op_reg;         // Latched ALU operation
+    reg  [4:0]  alu_op_reg;         // Latched ALU operation
 
     // Flag register
     reg         flag_s_reg;         // Sign
@@ -76,11 +91,10 @@ module alu_8085_top (
         .clk       (clk),
         .rst       (rst),
         .start     (start),
-        .alu_op_in (alu_op_in),
+        .alu_op    (alu_op_reg),    // Latched opcode (valid from S4)
         .load_a    (ctrl_load_a),
         .load_b    (ctrl_load_b),
         .load_op   (ctrl_load_op),
-        .execute   (ctrl_execute),
         .done      (ctrl_done),
         .acc_wr    (ctrl_acc_wr),
         .flag_wr   (ctrl_flag_wr),
@@ -95,7 +109,7 @@ module alu_8085_top (
         .a          (acc_reg),
         .b          (temp_b_reg),
         .alu_op     (alu_op_reg),
-        .carry_flag (flag_cy_reg),
+        .flags_in   (flags_out),        // Current flags {S, Z, AC, P, CY}
         .result     (alu_result),
         .flag_s     (alu_flag_s),
         .flag_z     (alu_flag_z),
@@ -112,7 +126,7 @@ module alu_8085_top (
         if (rst) begin
             acc_reg     <= 8'h00;
             temp_b_reg  <= 8'h00;
-            alu_op_reg  <= 4'h0;
+            alu_op_reg  <= 5'h00;
             flag_s_reg  <= 1'b0;
             flag_z_reg  <= 1'b1;    // Zero flag set on reset (acc = 0)
             flag_ac_reg <= 1'b0;
@@ -151,8 +165,9 @@ module alu_8085_top (
     //=========================================================================
 
     assign acc_out    = acc_reg;
-    assign result_out = alu_result;
     assign flags_out  = {flag_s_reg, flag_z_reg, flag_ac_reg, flag_p_reg, flag_cy_reg};
+    assign flag_reg_out = {flag_s_reg, flag_z_reg, 1'b0, flag_ac_reg,
+                           1'b0, flag_p_reg, 1'b0, flag_cy_reg};
     assign done       = ctrl_done;
 
 endmodule

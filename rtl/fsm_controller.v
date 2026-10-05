@@ -3,7 +3,7 @@
 // Description: FSM-based controller for the 8085 ALU.
 //              Sequences the ALU through Load → Execute → Done phases.
 //
-//              State diagram (from project's fsm_based_controller.jpeg):
+//              State diagram (see docs/fsm_controller.svg):
 //
 //              S0 (IDLE/RESET) ──start──► S1 (LOAD_A)
 //              S1 (LOAD_A)     ──────────► S2 (LOAD_B)
@@ -16,21 +16,23 @@
 //   - load_a   : Load Accumulator register
 //   - load_b   : Load Temp register B
 //   - load_op  : Latch the ALU operation code
-//   - execute  : Trigger ALU computation
 //   - done     : Result is valid, flags updated
-//   - acc_wr   : Write result back to Accumulator
-//   - flag_wr  : Write new flags to Flag Register
+//   - acc_wr   : Write result back to Accumulator (all ops except CMP)
+//   - flag_wr  : Write new flags to Flag Register (every op; the ALU passes
+//                through any flag the operation does not affect)
+//
+// alu_op is the opcode latched in S3 (not the raw input), so the write-back
+// decision in S4 always matches the operation the ALU is executing.
 //=============================================================================
 
 module fsm_controller (
     input  wire       clk,          // System clock
     input  wire       rst,          // Synchronous reset (active high)
     input  wire       start,        // Start operation
-    input  wire [3:0] alu_op_in,    // ALU operation from instruction decoder
+    input  wire [4:0] alu_op,       // Latched ALU operation (from S3)
     output reg        load_a,       // Load Accumulator
     output reg        load_b,       // Load Temp Reg B
     output reg        load_op,      // Latch ALU operation
-    output reg        execute,      // Execute ALU operation
     output reg        done,         // Operation complete
     output reg        acc_wr,       // Write-back to Accumulator
     output reg        flag_wr,      // Write-back to Flag Register
@@ -92,26 +94,18 @@ module fsm_controller (
     end
 
     //=========================================================================
-    // Output logic (combinational — Mealy/Moore hybrid)
+    // Output logic (combinational)
     //=========================================================================
 
-    // Determine if the current operation should NOT update the Accumulator
+    // CMP only updates flags; every other operation writes the Accumulator
     wire is_cmp;
-    assign is_cmp = (alu_op_in == 4'b0111);  // CMP: flags only, no write-back
-
-    // Determine if the current operation affects all flags, only CY, or none
-    // Rotate ops: only CY. CMA: no flags. STC/CMC: only CY.
-    wire is_rotate, is_cma, is_stc_cmc;
-    assign is_rotate  = (alu_op_in[3:2] == 2'b10);                         // 1000-1011
-    assign is_cma     = (alu_op_in == 4'b1100);                             // CMA
-    assign is_stc_cmc = (alu_op_in == 4'b1101) || (alu_op_in == 4'b1110);  // STC, CMC
+    assign is_cmp = (alu_op == 5'b00111);
 
     always @(*) begin
         // Defaults: all signals deasserted
         load_a    = 1'b0;
         load_b    = 1'b0;
         load_op   = 1'b0;
-        execute   = 1'b0;
         done      = 1'b0;
         acc_wr    = 1'b0;
         flag_wr   = 1'b0;
@@ -135,15 +129,8 @@ module fsm_controller (
             end
 
             S4_EXECUTE: begin
-                execute = 1'b1;     // ALU computes result (combinational)
-
-                // Write-back control
-                if (!is_cmp)        // CMP doesn't write result to Acc
-                    acc_wr = 1'b1;
-
-                // Flag write control
-                if (!is_cma)        // CMA doesn't affect any flags
-                    flag_wr = 1'b1;
+                acc_wr  = ~is_cmp;  // CMP doesn't write result to Acc
+                flag_wr = 1'b1;     // Unaffected flags are passed through
             end
 
             S5_DONE: begin
