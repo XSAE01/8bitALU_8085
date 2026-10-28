@@ -35,10 +35,6 @@ including the datapath, bit-slice and FSM diagrams, are in
 │   ├── tb_alu_8085_top.v              Full pipeline: exhaustive sweep, BCD, DAD
 │   └── alu_ref_model.vh               Shared reference model (`include)
 │
-├── sim/
-│   └── run_sim.bat                    Windows script for Icarus Verilog
-│                                      (writes to sim/output/, git-ignored)
-│
 ├── docs/
 │   ├── architecture.md                Design description
 │   ├── alu_8085_top.svg               Subsystem block diagram
@@ -130,32 +126,32 @@ S4; CMP skips the A write) → S5 (`done` high) → S0.
 
 ### Using Icarus Verilog (iverilog)
 
-```bash
-# Run all tests
-cd sim
-run_sim.bat
-
-# Run individual tests
-run_sim.bat full_adder
-run_sim.bat alu_4bit
-run_sim.bat alu_8bit
-run_sim.bat alu_8085_top
-```
-
-The exhaustive sweeps take a while: about 1.5 minutes for `alu_8bit` and
-3 minutes for `alu_8085_top` with Icarus Verilog.
-
-### Manual compilation
+Run from the project root. `-I tb` lets the testbenches `include
+`tb/alu_ref_model.vh`.
 
 ```bash
-# Compile and run the 8-bit ALU test
-# (-I tb lets the testbenches `include tb/alu_ref_model.vh)
-iverilog -I tb -o alu_8bit_test.vvp rtl/*.v tb/tb_alu_8bit.v
-vvp alu_8bit_test.vvp
+# Full Adder
+iverilog -o tb_full_adder.vvp rtl/full_adder.v tb/tb_full_adder.v
+vvp tb_full_adder.vvp
+
+# 4-bit ALU
+iverilog -o tb_alu_4bit.vvp rtl/full_adder.v rtl/alu_1bit_slice.v rtl/alu_4bit.v tb/tb_alu_4bit.v
+vvp tb_alu_4bit.vvp
+
+# 8-bit ALU
+iverilog -I tb -o tb_alu_8bit.vvp rtl/*.v tb/tb_alu_8bit.v
+vvp tb_alu_8bit.vvp
+
+# 8085 top level (FSM + ALU + registers)
+iverilog -I tb -o tb_alu_8085_top.vvp rtl/*.v tb/tb_alu_8085_top.v
+vvp tb_alu_8085_top.vvp
 
 # View waveforms
 gtkwave alu_8bit.vcd
 ```
+
+The exhaustive sweeps take a while: about 1.5 minutes for `alu_8bit` and
+3 minutes for `alu_8085_top` with Icarus Verilog.
 
 ### Using ModelSim / Questa
 
